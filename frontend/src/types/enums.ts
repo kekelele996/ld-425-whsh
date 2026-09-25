@@ -62,6 +62,14 @@ export const AcceptanceStatus = {
 } as const
 export type AcceptanceStatus = (typeof AcceptanceStatus)[keyof typeof AcceptanceStatus]
 
+// 节点用料登记状态：与后端 constants.UsageStatus 保持一致。
+export const UsageStatus = {
+  Registered: 'Registered',
+  Confirmed: 'Confirmed',
+  PendingConfirm: 'PendingConfirm',
+} as const
+export type UsageStatus = (typeof UsageStatus)[keyof typeof UsageStatus]
+
 export const Role = {
   Admin: 'Admin',
   Designer: 'Designer',

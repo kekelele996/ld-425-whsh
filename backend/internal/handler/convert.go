@@ -44,23 +44,30 @@ func toDesignDTO(phase *model.DesignPhase) dto.DesignDTO {
 	}
 }
 
-func toMaterialDTO(item *model.MaterialItem) dto.MaterialDTO {
+// toMaterialDTO 转换材料展示结构，installed 为累计已安装量（验收通过的用料登记）。
+func toMaterialDTO(item *model.MaterialItem, installed float64) dto.MaterialDTO {
+	remaining := item.Quantity - installed
+	if remaining < 0 {
+		remaining = 0
+	}
 	return dto.MaterialDTO{
-		ID:             item.ID,
-		ProjectID:      item.ProjectID,
-		Name:           item.Name,
-		Category:       item.Category,
-		Spec:           item.Spec,
-		Brand:          item.Brand,
-		Quantity:       item.Quantity,
-		Unit:           item.Unit,
-		UnitPrice:      item.UnitPrice,
-		TotalPrice:     item.TotalPrice,
-		PurchaseStatus: item.PurchaseStatus,
-		Supplier:       item.Supplier,
-		Space:          item.Space,
-		CreatedAt:      item.CreatedAt,
-		UpdatedAt:      item.UpdatedAt,
+		ID:                item.ID,
+		ProjectID:         item.ProjectID,
+		Name:              item.Name,
+		Category:          item.Category,
+		Spec:              item.Spec,
+		Brand:             item.Brand,
+		Quantity:          item.Quantity,
+		Unit:              item.Unit,
+		UnitPrice:         item.UnitPrice,
+		TotalPrice:        item.TotalPrice,
+		PurchaseStatus:    item.PurchaseStatus,
+		Supplier:          item.Supplier,
+		Space:             item.Space,
+		InstalledQuantity: installed,
+		RemainingQuantity: remaining,
+		CreatedAt:         item.CreatedAt,
+		UpdatedAt:         item.UpdatedAt,
 	}
 }
 
@@ -91,9 +98,30 @@ func toConstructionDTO(node *model.ConstructionNode) dto.ConstructionDTO {
 		AcceptanceStatus: node.AcceptanceStatus,
 		AcceptancePhotos: parseStringSlice(node.AcceptancePhotos),
 		AcceptanceNote:   node.AcceptanceNote,
+		Usages:           []dto.MaterialUsageDTO{},
 		CreatedAt:        node.CreatedAt,
 		UpdatedAt:        node.UpdatedAt,
 	}
+}
+
+// toMaterialUsageDTO 转换用料登记展示结构，附带材料名称与单位便于展示。
+func toMaterialUsageDTO(usage *model.MaterialUsage, material *model.MaterialItem) dto.MaterialUsageDTO {
+	out := dto.MaterialUsageDTO{
+		ID:         usage.ID,
+		ProjectID:  usage.ProjectID,
+		NodeID:     usage.NodeID,
+		MaterialID: usage.MaterialID,
+		Quantity:   usage.Quantity,
+		Status:     usage.Status,
+		Note:       usage.Note,
+		CreatedAt:  usage.CreatedAt,
+		UpdatedAt:  usage.UpdatedAt,
+	}
+	if material != nil {
+		out.MaterialName = material.Name
+		out.MaterialUnit = material.Unit
+	}
+	return out
 }
 
 func parseStringSlice(raw string) []string {
@@ -123,10 +151,11 @@ func toDesignDTOList(phases []model.DesignPhase) []dto.DesignDTO {
 	return out
 }
 
-func toMaterialDTOList(items []model.MaterialItem) []dto.MaterialDTO {
+// toMaterialDTOList 批量转换材料展示结构，installedMap 为各材料累计已安装量。
+func toMaterialDTOList(items []model.MaterialItem, installedMap map[uint]float64) []dto.MaterialDTO {
 	out := make([]dto.MaterialDTO, 0, len(items))
 	for _, item := range items {
-		out = append(out, toMaterialDTO(&item))
+		out = append(out, toMaterialDTO(&item, installedMap[item.ID]))
 	}
 	return out
 }
@@ -139,10 +168,25 @@ func toBudgetDTOList(items []model.BudgetItem) []dto.BudgetDTO {
 	return out
 }
 
-func toConstructionDTOList(nodes []model.ConstructionNode) []dto.ConstructionDTO {
+// toConstructionDTOList 批量转换施工节点展示结构，usageMap 为各节点的用料登记。
+func toConstructionDTOList(nodes []model.ConstructionNode, usageMap map[uint][]dto.MaterialUsageDTO) []dto.ConstructionDTO {
 	out := make([]dto.ConstructionDTO, 0, len(nodes))
 	for _, item := range nodes {
-		out = append(out, toConstructionDTO(&item))
+		nodeDTO := toConstructionDTO(&item)
+		if usages, ok := usageMap[item.ID]; ok {
+			nodeDTO.Usages = usages
+		}
+		out = append(out, nodeDTO)
+	}
+	return out
+}
+
+// groupUsagesByNode 用料登记按节点分组并转换为展示结构。
+func groupUsagesByNode(usages []model.MaterialUsage, materials map[uint]*model.MaterialItem) map[uint][]dto.MaterialUsageDTO {
+	out := make(map[uint][]dto.MaterialUsageDTO)
+	for i := range usages {
+		usage := &usages[i]
+		out[usage.NodeID] = append(out[usage.NodeID], toMaterialUsageDTO(usage, materials[usage.MaterialID]))
 	}
 	return out
 }

@@ -24,6 +24,7 @@ type Deps struct {
 	MaterialH  *handler.MaterialHandler
 	BudgetH    *handler.BudgetHandler
 	ConstructionH *handler.ConstructionHandler
+	MaterialUsageH *handler.MaterialUsageHandler
 	AuditH     *handler.AuditHandler
 	UploadH    *handler.UploadHandler
 }
@@ -56,6 +57,7 @@ func New(deps Deps) *gin.Engine {
 	registerMaterialRoutes(api, deps.MaterialH, auth, middleware.RBACMiddleware)
 	registerBudgetRoutes(api, deps.BudgetH, auth, middleware.RBACMiddleware)
 	registerConstructionRoutes(api, deps.ConstructionH, auth, middleware.RBACMiddleware)
+	registerMaterialUsageRoutes(api, deps.MaterialUsageH, auth, middleware.RBACMiddleware)
 
 	uploadGroup := api.Group("/upload", auth, middleware.UploadMiddleware(deps.Config.Upload))
 	uploadGroup.POST("", deps.UploadH.Upload)

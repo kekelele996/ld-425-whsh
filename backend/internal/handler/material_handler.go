@@ -3,6 +3,7 @@ package handler
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/home-renovation/platform/internal/dto"
+	"github.com/home-renovation/platform/internal/model"
 	"github.com/home-renovation/platform/internal/service"
 	"github.com/home-renovation/platform/internal/utils"
 )
@@ -29,7 +30,7 @@ func (h *MaterialHandler) Create(c *gin.Context) {
 		c.Error(err)
 		return
 	}
-	utils.Success(c, toMaterialDTO(item))
+	utils.Success(c, toMaterialDTO(item, 0))
 }
 
 // Get 获取材料项详情。
@@ -44,7 +45,12 @@ func (h *MaterialHandler) Get(c *gin.Context) {
 		c.Error(err)
 		return
 	}
-	utils.Success(c, toMaterialDTO(item))
+	installed, err := h.service.GetInstalledQuantity(id)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	utils.Success(c, toMaterialDTO(item, installed))
 }
 
 // List 获取材料列表。
@@ -64,7 +70,12 @@ func (h *MaterialHandler) List(c *gin.Context) {
 			c.Error(err)
 			return
 		}
-		utils.Success(c, toMaterialDTOList(items))
+		installedMap, err := h.installedMap(items)
+		if err != nil {
+			c.Error(err)
+			return
+		}
+		utils.Success(c, toMaterialDTOList(items, installedMap))
 		return
 	}
 	items, total, err := h.service.List(0, category, space, page, pageSize)
@@ -72,7 +83,12 @@ func (h *MaterialHandler) List(c *gin.Context) {
 		c.Error(err)
 		return
 	}
-	utils.Success(c, utils.PageResult{List: toMaterialDTOList(items), Total: total, Page: page, PageSize: pageSize})
+	installedMap, err := h.installedMap(items)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	utils.Success(c, utils.PageResult{List: toMaterialDTOList(items, installedMap), Total: total, Page: page, PageSize: pageSize})
 }
 
 // Update 更新材料项。
@@ -92,7 +108,12 @@ func (h *MaterialHandler) Update(c *gin.Context) {
 		c.Error(err)
 		return
 	}
-	utils.Success(c, toMaterialDTO(item))
+	installed, err := h.service.GetInstalledQuantity(id)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	utils.Success(c, toMaterialDTO(item, installed))
 }
 
 // Delete 删除材料项。
@@ -126,5 +147,19 @@ func (h *MaterialHandler) UpdateStatus(c *gin.Context) {
 		c.Error(err)
 		return
 	}
-	utils.Success(c, toMaterialDTO(item))
+	installed, err := h.service.GetInstalledQuantity(id)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	utils.Success(c, toMaterialDTO(item, installed))
+}
+
+// installedMap 批量查询材料的累计已安装量。
+func (h *MaterialHandler) installedMap(items []model.MaterialItem) (map[uint]float64, error) {
+	ids := make([]uint, 0, len(items))
+	for _, item := range items {
+		ids = append(ids, item.ID)
+	}
+	return h.service.GetInstalledMap(ids)
 }

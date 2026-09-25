@@ -8,5 +8,6 @@ export const API_PATHS = {
   materials: '/api/v1/materials',
   budgets: '/api/v1/budgets',
   constructions: '/api/v1/constructions',
+  materialUsages: '/api/v1/material-usages',
   auditLogs: '/api/v1/audit-logs',
 } as const

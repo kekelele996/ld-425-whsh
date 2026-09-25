@@ -22,16 +22,21 @@ type MaterialService interface {
 	Update(id uint, req *dto.UpdateMaterialRequest) (*model.MaterialItem, error)
 	Delete(id uint) error
 	UpdateStatus(id uint, status string) (*model.MaterialItem, error)
+	// GetInstalledQuantity 查询单个材料的累计已安装量（仅统计验收通过的用料登记）。
+	GetInstalledQuantity(materialID uint) (float64, error)
+	// GetInstalledMap 按材料 ID 批量查询累计已安装量。
+	GetInstalledMap(materialIDs []uint) (map[uint]float64, error)
 }
 
 type materialService struct {
-	repo   repository.MaterialRepository
-	logger *slog.Logger
+	repo      repository.MaterialRepository
+	usageRepo repository.MaterialUsageRepository
+	logger    *slog.Logger
 }
 
 // NewMaterialService 构造材料服务。
-func NewMaterialService(repo repository.MaterialRepository, logger *slog.Logger) MaterialService {
-	return &materialService{repo: repo, logger: logger}
+func NewMaterialService(repo repository.MaterialRepository, usageRepo repository.MaterialUsageRepository, logger *slog.Logger) MaterialService {
+	return &materialService{repo: repo, usageRepo: usageRepo, logger: logger}
 }
 
 func (s *materialService) Create(req *dto.CreateMaterialRequest) (*model.MaterialItem, error) {
@@ -87,6 +92,18 @@ func (s *materialService) Update(id uint, req *dto.UpdateMaterialRequest) (*mode
 	if err != nil {
 		return nil, err
 	}
+	if req.Quantity != nil {
+		// 采购量调整后不能低于已安装量。
+		installed, err := s.usageRepo.SumConfirmedByMaterial(id)
+		if err != nil {
+			return nil, fmt.Errorf("sum installed quantity: %w", err)
+		}
+		if *req.Quantity+quantityEpsilon < installed {
+			return nil, apperrors.NewConflict(
+				fmt.Sprintf("采购量不能小于累计已安装量（已安装 %.2f）", installed),
+			)
+		}
+	}
 	if req.Name != nil {
 		item.Name = *req.Name
 	}
@@ -125,6 +142,13 @@ func (s *materialService) Delete(id uint) error {
 	if _, err := s.GetByID(id); err != nil {
 		return err
 	}
+	count, err := s.usageRepo.CountByMaterialID(id)
+	if err != nil {
+		return fmt.Errorf("count material usages: %w", err)
+	}
+	if count > 0 {
+		return apperrors.NewConflict("material has usage records and cannot be deleted")
+	}
 	if err := s.repo.Delete(id); err != nil {
 		return fmt.Errorf("delete material item: %w", err)
 	}
@@ -138,6 +162,11 @@ func (s *materialService) UpdateStatus(id uint, status string) (*model.MaterialI
 	item, err := s.GetByID(id)
 	if err != nil {
 		return nil, err
+	}
+	// Installed 由节点验收通过后按已安装量自动推进，禁止手工直接标记，
+	// 避免“材料标成安装完成却没说用在哪道工序”。
+	if status == constants.PurchaseStatusInstalled && item.PurchaseStatus != constants.PurchaseStatusInstalled {
+		return nil, apperrors.NewConflict("installed status is set automatically after acceptance")
 	}
 	order := map[string]int{
 		constants.PurchaseStatusNotPurchased: 0,
@@ -154,4 +183,20 @@ func (s *materialService) UpdateStatus(id uint, status string) (*model.MaterialI
 	}
 	s.logger.Info("material purchase status changed", "material_id", id, "status", status)
 	return item, nil
+}
+
+func (s *materialService) GetInstalledQuantity(materialID uint) (float64, error) {
+	total, err := s.usageRepo.SumConfirmedByMaterial(materialID)
+	if err != nil {
+		return 0, fmt.Errorf("get installed quantity: %w", err)
+	}
+	return total, nil
+}
+
+func (s *materialService) GetInstalledMap(materialIDs []uint) (map[uint]float64, error) {
+	totals, err := s.usageRepo.SumConfirmedByMaterials(materialIDs)
+	if err != nil {
+		return nil, fmt.Errorf("get installed quantity map: %w", err)
+	}
+	return totals, nil
 }

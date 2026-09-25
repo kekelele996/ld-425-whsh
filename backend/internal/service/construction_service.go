@@ -11,6 +11,7 @@ import (
 	apperrors "github.com/home-renovation/platform/internal/errors"
 	"github.com/home-renovation/platform/internal/model"
 	"github.com/home-renovation/platform/internal/repository"
+	"gorm.io/gorm"
 )
 
 // ConstructionService 施工节点服务接口。
@@ -26,13 +27,22 @@ type ConstructionService interface {
 }
 
 type constructionService struct {
-	repo   repository.ConstructionRepository
-	logger *slog.Logger
+	repo      repository.ConstructionRepository
+	usageRepo repository.MaterialUsageRepository
+	usageSvc  MaterialUsageService
+	txRunner  repository.TxRunner
+	logger    *slog.Logger
 }
 
 // NewConstructionService 构造施工服务。
-func NewConstructionService(repo repository.ConstructionRepository, logger *slog.Logger) ConstructionService {
-	return &constructionService{repo: repo, logger: logger}
+func NewConstructionService(
+	repo repository.ConstructionRepository,
+	usageRepo repository.MaterialUsageRepository,
+	usageSvc MaterialUsageService,
+	txRunner repository.TxRunner,
+	logger *slog.Logger,
+) ConstructionService {
+	return &constructionService{repo: repo, usageRepo: usageRepo, usageSvc: usageSvc, txRunner: txRunner, logger: logger}
 }
 
 func (s *constructionService) Create(req *dto.CreateConstructionRequest) (*model.ConstructionNode, error) {
@@ -118,6 +128,13 @@ func (s *constructionService) Delete(id uint) error {
 	if _, err := s.GetByID(id); err != nil {
 		return err
 	}
+	count, err := s.usageRepo.CountByNodeID(id)
+	if err != nil {
+		return fmt.Errorf("count node usages: %w", err)
+	}
+	if count > 0 {
+		return apperrors.NewConflict("construction node has usage records and cannot be deleted")
+	}
 	if err := s.repo.Delete(id); err != nil {
 		return fmt.Errorf("delete construction node: %w", err)
 	}
@@ -166,6 +183,12 @@ func (s *constructionService) Accept(id uint, req *dto.AcceptConstructionRequest
 	if node.Status != constants.ConstructionStatusCompleted {
 		return nil, apperrors.NewConflict("only completed node can be accepted")
 	}
+	// 幂等：验收通过后保留第一次结果，重复提交不再重复计数。
+	if node.AcceptanceStatus == constants.AcceptanceStatusPassed {
+		s.logger.Info("construction acceptance repeated, keep first result", "node_id", id)
+		return node, nil
+	}
+
 	if req.Accepted {
 		node.AcceptanceStatus = constants.AcceptanceStatusPassed
 	} else {
@@ -173,8 +196,29 @@ func (s *constructionService) Accept(id uint, req *dto.AcceptConstructionRequest
 	}
 	node.AcceptancePhotos = marshalStrings(req.Photos)
 	node.AcceptanceNote = req.Note
-	if err := s.repo.Update(node); err != nil {
-		return nil, fmt.Errorf("accept construction node: %w", err)
+
+	// 验收结论与用料计数必须在同一事务内提交：
+	// 通过则把节点下已登记用料计入已安装量（超采购量整体回滚），
+	// 不通过则把已登记用料转为待确认，不参与余量计算。
+	err = s.txRunner.Transaction(func(tx *gorm.DB) error {
+		txNodeRepo := repository.NewConstructionRepository(tx)
+		if err := txNodeRepo.Update(node); err != nil {
+			return fmt.Errorf("accept construction node: %w", err)
+		}
+		txUsageSvc := s.usageSvc.WithTx(tx)
+		if req.Accepted {
+			if err := txUsageSvc.ConfirmNodeUsages(id); err != nil {
+				return err
+			}
+		} else {
+			if err := txUsageSvc.MarkNodeUsagesPendingConfirm(id); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	s.logger.Info("construction node accepted", "node_id", id, "accepted", req.Accepted)
 	return node, nil

@@ -82,11 +82,14 @@ docker compose --env-file .env down -v --remove-orphans
 | PUT | /api/v1/designs/:id/submit | 提交审核 | Admin/Designer/PM |
 | PUT | /api/v1/designs/:id/review | 审核（通过/驳回） | Admin/Owner |
 | GET/POST | /api/v1/materials | 材料列表/创建 | 列表所有角色，创建 Admin/Designer/PM |
-| PUT | /api/v1/materials/:id/status | 采购状态流转 | Admin/Designer/Contractor/PM |
+| PUT | /api/v1/materials/:id/status | 采购状态流转（仅到到货，安装由验收自动推进） | Admin/Designer/Contractor/PM |
 | GET/POST | /api/v1/budgets | 预算列表/创建 | 列表所有角色，创建 Admin/PM |
 | GET/POST | /api/v1/constructions | 施工列表/创建 | 列表所有角色，创建 Admin/PM |
 | PUT | /api/v1/constructions/:id/status | 施工状态流转 | Admin/Contractor/PM |
-| PUT | /api/v1/constructions/:id/accept | 施工验收 | Admin/Contractor/PM |
+| PUT | /api/v1/constructions/:id/accept | 施工验收（通过计入已安装量，不通过转待确认） | Admin/Contractor/PM |
+| GET/POST | /api/v1/constructions/:id/usages | 节点用料查看/完工前登记本次用料 | 列表所有角色，登记 Admin/Contractor/PM |
+| GET | /api/v1/material-usages?project_id= | 按项目查看全部节点用料 | 登录用户 |
+| DELETE | /api/v1/material-usages/:id | 删除未确认用料登记 | Admin/Contractor/PM |
 | POST | /api/v1/upload | 文件上传 | 登录用户 |
 | GET | /api/v1/audit-logs | 操作日志 | Admin |
 

@@ -49,6 +49,10 @@ type MaterialDTO struct {
 	PurchaseStatus string    `json:"purchase_status"`
 	Supplier       string    `json:"supplier"`
 	Space          string    `json:"space"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	// InstalledQuantity 已安装量：验收通过的用料登记累计值。
+	InstalledQuantity float64 `json:"installed_quantity"`
+	// RemainingQuantity 剩余量：采购量 - 已安装量（待确认记录不参与计算）。
+	RemainingQuantity float64   `json:"remaining_quantity"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }

@@ -61,11 +61,46 @@ paths:
           description: 成功
   /constructions/{id}/accept:
     put:
-      summary: 施工验收
+      summary: 施工验收（验收通过后节点用料计入材料已安装量；不通过则转为待确认）
       tags: [Construction]
       parameters:
         - name: id
           in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 成功
+  /constructions/{id}/usages:
+    get:
+      summary: 查看节点用料登记
+      tags: [Construction]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 成功
+    post:
+      summary: 节点完工前登记本次用料（client_key 幂等，重复提交保留第一次结果）
+      tags: [Construction]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 成功
+  /material-usages:
+    get:
+      summary: 按项目查看全部节点用料
+      tags: [Material]
+      parameters:
+        - name: project_id
+          in: query
           required: true
           schema: { type: integer }
       responses:

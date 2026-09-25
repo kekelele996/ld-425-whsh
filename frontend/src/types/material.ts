@@ -14,6 +14,10 @@ export interface MaterialItem {
   purchase_status: PurchaseStatus
   supplier: string
   space: string
+  // 累计已安装量：验收通过的节点用料登记合计。
+  installed_quantity: number
+  // 剩余量：采购量 - 已安装量（待确认记录不参与计算）。
+  remaining_quantity: number
   created_at: string
   updated_at: string
 }

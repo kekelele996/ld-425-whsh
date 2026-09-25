@@ -62,6 +62,16 @@ const (
 	AcceptanceStatusFailed  = "Failed"
 )
 
+// UsageStatus 节点用料登记状态。
+const (
+	// UsageStatusRegistered 已登记：节点完工前登记本次用料，等待验收。
+	UsageStatusRegistered = "Registered"
+	// UsageStatusConfirmed 已确认：验收通过，计入材料已安装量。
+	UsageStatusConfirmed = "Confirmed"
+	// UsageStatusPendingConfirm 待确认：一次验收不通过，不参与余量计算。
+	UsageStatusPendingConfirm = "PendingConfirm"
+)
+
 // Role 系统角色。
 const (
 	RoleAdmin          = "Admin"
@@ -94,6 +104,7 @@ var (
 		ConstructionStatusPending, ConstructionStatusInProgress, ConstructionStatusCompleted, ConstructionStatusDelayed,
 	}
 	AcceptanceStatuses = []string{AcceptanceStatusPending, AcceptanceStatusPassed, AcceptanceStatusFailed}
+	UsageStatuses      = []string{UsageStatusRegistered, UsageStatusConfirmed, UsageStatusPendingConfirm}
 	Roles              = []string{RoleAdmin, RoleDesigner, RoleContractor, RoleOwner, RoleProjectManager}
 )
 

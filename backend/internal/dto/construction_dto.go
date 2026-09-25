@@ -42,6 +42,8 @@ type ConstructionDTO struct {
 	AcceptanceStatus string     `json:"acceptance_status"`
 	AcceptancePhotos []string   `json:"acceptance_photos"`
 	AcceptanceNote   string     `json:"acceptance_note"`
-	CreatedAt        time.Time  `json:"created_at"`
-	UpdatedAt        time.Time  `json:"updated_at"`
+	// Usages 节点用料登记记录，随节点列表返回，便于施工页展开查看。
+	Usages    []MaterialUsageDTO `json:"usages"`
+	CreatedAt time.Time          `json:"created_at"`
+	UpdatedAt time.Time          `json:"updated_at"`
 }

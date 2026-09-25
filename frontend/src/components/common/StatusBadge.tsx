@@ -21,6 +21,9 @@ const colorMap: Record<string, string> = {
   Delayed: 'red',
   Passed: 'green',
   Failed: 'red',
+  Registered: 'gold',
+  Confirmed: 'green',
+  PendingConfirm: 'red',
 }
 
 export default function StatusBadge({ status }: StatusBadgeProps) {

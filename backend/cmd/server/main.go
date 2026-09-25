@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/home-renovation/platform/internal/config"
+	"github.com/home-renovation/platform/internal/constants"
 	"github.com/home-renovation/platform/internal/dto"
 	"github.com/home-renovation/platform/internal/handler"
 	"github.com/home-renovation/platform/internal/logger"
@@ -41,6 +42,7 @@ func main() {
 	projectRepo := repository.NewProjectRepository(db)
 	designRepo := repository.NewDesignRepository(db)
 	materialRepo := repository.NewMaterialRepository(db)
+	usageRepo := repository.NewMaterialUsageRepository(db)
 	budgetRepo := repository.NewBudgetRepository(db)
 	constructionRepo := repository.NewConstructionRepository(db)
 	userRepo := repository.NewUserRepository(db)
@@ -51,15 +53,16 @@ func main() {
 	auditSvc := service.NewAuditService(auditRepo, log)
 	projectSvc := service.NewProjectService(projectRepo, log)
 	designSvc := service.NewDesignService(designRepo, log)
-	materialSvc := service.NewMaterialService(materialRepo, log)
+	materialSvc := service.NewMaterialService(materialRepo, usageRepo, log)
 	budgetSvc := service.NewBudgetService(budgetRepo, log)
-	constructionSvc := service.NewConstructionService(constructionRepo, log)
+	usageSvc := service.NewMaterialUsageService(usageRepo, materialRepo, constructionRepo, log)
+	constructionSvc := service.NewConstructionService(constructionRepo, usageRepo, usageSvc, repository.NewTxRunner(db), log)
 
 	if err := userSvc.SeedIfEmpty(); err != nil {
 		log.Error("seed users failed", "error", err)
 		os.Exit(1)
 	}
-	if err := seedDemoData(projectSvc, designSvc, materialSvc, budgetSvc, constructionSvc, log); err != nil {
+	if err := seedDemoData(projectSvc, designSvc, materialSvc, budgetSvc, constructionSvc, usageSvc, log); err != nil {
 		log.Error("seed demo data failed", "error", err)
 		os.Exit(1)
 	}
@@ -75,7 +78,8 @@ func main() {
 		DesignH:        handler.NewDesignHandler(designSvc),
 		MaterialH:      handler.NewMaterialHandler(materialSvc),
 		BudgetH:        handler.NewBudgetHandler(budgetSvc),
-		ConstructionH:  handler.NewConstructionHandler(constructionSvc),
+		ConstructionH:  handler.NewConstructionHandler(constructionSvc, usageSvc, materialSvc),
+		MaterialUsageH: handler.NewMaterialUsageHandler(usageSvc, materialSvc),
 		AuditH:         handler.NewAuditHandler(auditSvc),
 		UploadH:        handler.NewUploadHandler(),
 	})
@@ -118,6 +122,7 @@ func migrate(db *gorm.DB) error {
 		&model.MaterialItem{},
 		&model.BudgetItem{},
 		&model.ConstructionNode{},
+		&model.MaterialUsage{},
 		&model.AuditLog{},
 	)
 }
@@ -128,6 +133,7 @@ func seedDemoData(
 	materialSvc service.MaterialService,
 	budgetSvc service.BudgetService,
 	constructionSvc service.ConstructionService,
+	usageSvc service.MaterialUsageService,
 	log *slog.Logger,
 ) error {
 	_, total, err := projectSvc.List("", "", 1, 1)
@@ -169,13 +175,16 @@ func seedDemoData(
 		{"乳胶漆", "油漆", "5L", "多乐士", "客厅", 12, 328},
 		{"LED筒灯", "灯具", "7W", "欧普", "厨房", 18, 59},
 	}
+	materialIDs := make(map[string]uint)
 	for _, item := range materials {
-		if _, err := materialSvc.Create(&dto.CreateMaterialRequest{
+		created, err := materialSvc.Create(&dto.CreateMaterialRequest{
 			ProjectID: project.ID, Name: item.name, Category: item.category, Spec: item.spec,
 			Brand: item.brand, Quantity: item.qty, Unit: "件", UnitPrice: item.price, Space: item.space,
-		}); err != nil {
+		})
+		if err != nil {
 			return fmt.Errorf("seed material %s: %w", item.name, err)
 		}
+		materialIDs[item.name] = created.ID
 	}
 
 	budgets := []struct {
@@ -208,13 +217,65 @@ func seedDemoData(
 		{"安装", "2026-11-21", "2026-12-15"},
 		{"软装", "2026-12-16", "2026-12-31"},
 	}
+	nodeIDs := make(map[string]uint)
 	for _, item := range nodes {
-		if _, err := constructionSvc.Create(&dto.CreateConstructionRequest{
+		created, err := constructionSvc.Create(&dto.CreateConstructionRequest{
 			ProjectID: project.ID, Name: item.name, PlannedStartDate: &item.start, PlannedEndDate: &item.end,
-		}); err != nil {
+		})
+		if err != nil {
 			return fmt.Errorf("seed construction %s: %w", item.name, err)
 		}
+		nodeIDs[item.name] = created.ID
 	}
+
+	// 种子用料演示：
+	// 1) 抛光砖到货 → 瓦工节点完工前登记 30 件 → 验收通过计入已安装量（剩余 50 件）；
+	// 2) 乳胶漆到货 → 油漆节点已完工待验收，登记 4 件（Registered，不计入已安装量）。
+	tileID := materialIDs["抛光砖"]
+	if _, err := materialSvc.UpdateStatus(tileID, constants.PurchaseStatusOrdered); err != nil {
+		return fmt.Errorf("seed material order: %w", err)
+	}
+	if _, err := materialSvc.UpdateStatus(tileID, constants.PurchaseStatusDelivered); err != nil {
+		return fmt.Errorf("seed material delivery: %w", err)
+	}
+	tilingNodeID := nodeIDs["瓦工"]
+	if _, err := constructionSvc.UpdateStatus(tilingNodeID, constants.ConstructionStatusInProgress); err != nil {
+		return fmt.Errorf("seed tiling node start: %w", err)
+	}
+	if _, err := usageSvc.Register(tilingNodeID, &dto.RegisterMaterialUsageRequest{
+		MaterialID: tileID, Quantity: 30, Note: "客厅地面铺贴", ClientKey: "seed-tiling-tile",
+	}); err != nil {
+		return fmt.Errorf("seed tiling usage: %w", err)
+	}
+	if _, err := constructionSvc.UpdateStatus(tilingNodeID, constants.ConstructionStatusCompleted); err != nil {
+		return fmt.Errorf("seed tiling node complete: %w", err)
+	}
+	if _, err := constructionSvc.Accept(tilingNodeID, &dto.AcceptConstructionRequest{
+		Accepted: true, Note: "验收通过",
+	}); err != nil {
+		return fmt.Errorf("seed tiling accept: %w", err)
+	}
+
+	paintID := materialIDs["乳胶漆"]
+	if _, err := materialSvc.UpdateStatus(paintID, constants.PurchaseStatusOrdered); err != nil {
+		return fmt.Errorf("seed paint order: %w", err)
+	}
+	if _, err := materialSvc.UpdateStatus(paintID, constants.PurchaseStatusDelivered); err != nil {
+		return fmt.Errorf("seed paint delivery: %w", err)
+	}
+	paintingNodeID := nodeIDs["油漆"]
+	if _, err := constructionSvc.UpdateStatus(paintingNodeID, constants.ConstructionStatusInProgress); err != nil {
+		return fmt.Errorf("seed painting node start: %w", err)
+	}
+	if _, err := usageSvc.Register(paintingNodeID, &dto.RegisterMaterialUsageRequest{
+		MaterialID: paintID, Quantity: 4, Note: "待墙面验收", ClientKey: "seed-painting-paint",
+	}); err != nil {
+		return fmt.Errorf("seed painting usage: %w", err)
+	}
+	if _, err := constructionSvc.UpdateStatus(paintingNodeID, constants.ConstructionStatusCompleted); err != nil {
+		return fmt.Errorf("seed painting node complete: %w", err)
+	}
+
 	log.Info("seeded demo project", "project", project.Name, "project_id", project.ID)
 	return nil
 }

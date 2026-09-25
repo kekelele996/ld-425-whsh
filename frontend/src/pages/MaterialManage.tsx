@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button, Card, Form, Input, InputNumber, Modal, Select, Space, Table, Typography, message, Statistic } from 'antd'
+import { Button, Card, Form, Input, InputNumber, Modal, Select, Space, Table, Tag, Typography, message, Statistic } from 'antd'
 import { PlusOutlined, ShoppingCartOutlined } from '@ant-design/icons'
 import StatusBadge from '@/components/common/StatusBadge'
 import ProgressTag from '@/components/common/ProgressTag'
@@ -14,7 +14,13 @@ import { formatCurrency } from '@/utils/formatBudget'
 import { MaterialCategory, MaterialSpace, PurchaseStatus, Role } from '@/types/enums'
 import type { MaterialItem } from '@/types'
 
-const purchaseSteps = [PurchaseStatus.NotPurchased, PurchaseStatus.Ordered, PurchaseStatus.Delivered, PurchaseStatus.Installed]
+// 采购推进只到“已到货”；“已安装”由节点验收通过后按已安装量自动推进。
+const purchaseSteps: PurchaseStatus[] = [PurchaseStatus.NotPurchased, PurchaseStatus.Ordered, PurchaseStatus.Delivered]
+
+const stepLabel: Record<string, string> = {
+  [PurchaseStatus.NotPurchased]: '推进采购',
+  [PurchaseStatus.Ordered]: '确认到货',
+}
 
 export default function MaterialManage() {
   const { materials, fetchMaterials } = useMaterialStore()
@@ -45,6 +51,7 @@ export default function MaterialManage() {
   }, [materials, category, space])
 
   const totalCost = filtered.reduce((sum, item) => sum + item.total_price, 0)
+  const totalInstalledCost = filtered.reduce((sum, item) => sum + item.installed_quantity * item.unit_price, 0)
   const materialBudget = budgets.filter((b) => b.category === 'Material').reduce((sum, b) => sum + b.budget_amount, 0)
 
   const canEdit = user?.role === Role.Admin || user?.role === Role.Designer || user?.role === Role.ProjectManager
@@ -114,8 +121,12 @@ export default function MaterialManage() {
       <Card style={{ marginBottom: 16 }}>
         <Space size="large">
           <Statistic title="材料费用汇总" value={totalCost} precision={2} prefix="¥" />
+          <Statistic title="已安装材料价值" value={totalInstalledCost} precision={2} prefix="¥" />
           <Statistic title="材料预算" value={materialBudget} precision={2} prefix="¥" />
         </Space>
+        <Typography.Paragraph type="secondary" style={{ marginBottom: 0, marginTop: 8 }}>
+          已安装量来自施工节点验收通过的用料登记；验收不通过的登记转为待确认，不计入已安装量与剩余量。
+        </Typography.Paragraph>
       </Card>
 
       <Card>
@@ -131,7 +142,29 @@ export default function MaterialManage() {
               { title: '品类', dataIndex: 'category', render: (v) => <ProgressTag text={v} color="cyan" /> },
               { title: '规格型号', dataIndex: 'spec' },
               { title: '品牌', dataIndex: 'brand' },
-              { title: '数量', dataIndex: 'quantity' },
+              {
+                title: '采购量',
+                dataIndex: 'quantity',
+                render: (v, record) => `${v} ${record.unit}`,
+              },
+              {
+                title: '已安装',
+                dataIndex: 'installed_quantity',
+                render: (v: number, record) => (
+                  <span>
+                    {v} {record.unit}
+                  </span>
+                ),
+              },
+              {
+                title: '剩余',
+                dataIndex: 'remaining_quantity',
+                render: (v: number, record) => (
+                  <Tag color={v > 0 ? 'green' : 'default'}>
+                    {v} {record.unit}
+                  </Tag>
+                ),
+              },
               { title: '单价', dataIndex: 'unit_price', render: (v) => formatCurrency(v) },
               { title: '总价', dataIndex: 'total_price', render: (v) => formatCurrency(v) },
               { title: '采购状态', dataIndex: 'purchase_status', render: (v) => <StatusBadge status={v} /> },
@@ -139,13 +172,13 @@ export default function MaterialManage() {
               {
                 title: '操作',
                 render: (_, record) =>
-                  canProcure && record.purchase_status !== PurchaseStatus.Installed ? (
+                  canProcure && purchaseSteps.includes(record.purchase_status as PurchaseStatus) ? (
                     <Button
                       size="small"
                       icon={<ShoppingCartOutlined />}
                       onClick={() => advanceStatus(record)}
                     >
-                      推进采购
+                      {stepLabel[record.purchase_status] ?? '推进采购'}
                     </Button>
                   ) : null,
               },
@@ -164,7 +197,7 @@ export default function MaterialManage() {
           </Form.Item>
           <Form.Item name="spec" label="规格型号"><Input /></Form.Item>
           <Form.Item name="brand" label="品牌"><Input /></Form.Item>
-          <Form.Item name="quantity" label="数量" rules={[{ required: true }]}>
+          <Form.Item name="quantity" label="采购量" rules={[{ required: true }]}>
             <InputNumber min={0} style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="unit" label="单位" rules={[{ required: true }]}>
