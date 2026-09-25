@@ -41,19 +41,22 @@ func main() {
 	projectRepo := repository.NewProjectRepository(db)
 	designRepo := repository.NewDesignRepository(db)
 	materialRepo := repository.NewMaterialRepository(db)
+	materialUsageRepo := repository.NewMaterialUsageRepository(db)
 	budgetRepo := repository.NewBudgetRepository(db)
 	constructionRepo := repository.NewConstructionRepository(db)
 	userRepo := repository.NewUserRepository(db)
 	auditRepo := repository.NewAuditLogRepository(db)
+	txMgr := repository.NewTransactionManager(db)
 
 	// 装配服务层。
 	userSvc := service.NewUserService(userRepo, cfg.JWT, log)
 	auditSvc := service.NewAuditService(auditRepo, log)
 	projectSvc := service.NewProjectService(projectRepo, log)
 	designSvc := service.NewDesignService(designRepo, log)
-	materialSvc := service.NewMaterialService(materialRepo, log)
+	materialSvc := service.NewMaterialService(materialRepo, materialUsageRepo, log)
+	materialUsageSvc := service.NewMaterialUsageService(materialUsageRepo, constructionRepo, materialRepo, log)
 	budgetSvc := service.NewBudgetService(budgetRepo, log)
-	constructionSvc := service.NewConstructionService(constructionRepo, log)
+	constructionSvc := service.NewConstructionService(constructionRepo, txMgr, log)
 
 	if err := userSvc.SeedIfEmpty(); err != nil {
 		log.Error("seed users failed", "error", err)
@@ -74,8 +77,9 @@ func main() {
 		ProjectH:       handler.NewProjectHandler(projectSvc),
 		DesignH:        handler.NewDesignHandler(designSvc),
 		MaterialH:      handler.NewMaterialHandler(materialSvc),
+		MaterialUsageH: handler.NewMaterialUsageHandler(materialUsageSvc),
 		BudgetH:        handler.NewBudgetHandler(budgetSvc),
-		ConstructionH:  handler.NewConstructionHandler(constructionSvc),
+		ConstructionH:  handler.NewConstructionHandler(constructionSvc, materialUsageSvc),
 		AuditH:         handler.NewAuditHandler(auditSvc),
 		UploadH:        handler.NewUploadHandler(),
 	})
@@ -116,6 +120,7 @@ func migrate(db *gorm.DB) error {
 		&model.RenovationProject{},
 		&model.DesignPhase{},
 		&model.MaterialItem{},
+		&model.MaterialUsage{},
 		&model.BudgetItem{},
 		&model.ConstructionNode{},
 		&model.AuditLog{},

@@ -62,6 +62,16 @@ const (
 	AcceptanceStatusFailed  = "Failed"
 )
 
+// MaterialUsageStatus 节点用料状态。
+const (
+	// MaterialUsageStatusPending 已登记、待验收计入。
+	MaterialUsageStatusPending = "Pending"
+	// MaterialUsageStatusCounted 验收通过，已计入材料已安装量。
+	MaterialUsageStatusCounted = "Counted"
+	// MaterialUsageStatusExcluded 验收不通过，待确认，不参与余量计算。
+	MaterialUsageStatusExcluded = "Excluded"
+)
+
 // Role 系统角色。
 const (
 	RoleAdmin          = "Admin"
@@ -93,8 +103,9 @@ var (
 	ConstructionStatuses = []string{
 		ConstructionStatusPending, ConstructionStatusInProgress, ConstructionStatusCompleted, ConstructionStatusDelayed,
 	}
-	AcceptanceStatuses = []string{AcceptanceStatusPending, AcceptanceStatusPassed, AcceptanceStatusFailed}
-	Roles              = []string{RoleAdmin, RoleDesigner, RoleContractor, RoleOwner, RoleProjectManager}
+	AcceptanceStatuses    = []string{AcceptanceStatusPending, AcceptanceStatusPassed, AcceptanceStatusFailed}
+	MaterialUsageStatuses = []string{MaterialUsageStatusPending, MaterialUsageStatusCounted, MaterialUsageStatusExcluded}
+	Roles                 = []string{RoleAdmin, RoleDesigner, RoleContractor, RoleOwner, RoleProjectManager}
 )
 
 // Contains 判断字符串是否在集合内。

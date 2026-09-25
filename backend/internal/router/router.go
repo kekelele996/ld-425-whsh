@@ -14,18 +14,19 @@ import (
 
 // Deps 路由装配依赖。
 type Deps struct {
-	Config     *config.Config
-	Logger     *slog.Logger
-	UserSvc    service.UserService
-	AuditSvc   service.AuditService
-	AuditRepo  repository.AuditLogRepository
-	ProjectH   *handler.ProjectHandler
-	DesignH    *handler.DesignHandler
-	MaterialH  *handler.MaterialHandler
-	BudgetH    *handler.BudgetHandler
-	ConstructionH *handler.ConstructionHandler
-	AuditH     *handler.AuditHandler
-	UploadH    *handler.UploadHandler
+	Config         *config.Config
+	Logger         *slog.Logger
+	UserSvc        service.UserService
+	AuditSvc       service.AuditService
+	AuditRepo      repository.AuditLogRepository
+	ProjectH       *handler.ProjectHandler
+	DesignH        *handler.DesignHandler
+	MaterialH      *handler.MaterialHandler
+	MaterialUsageH *handler.MaterialUsageHandler
+	BudgetH        *handler.BudgetHandler
+	ConstructionH  *handler.ConstructionHandler
+	AuditH         *handler.AuditHandler
+	UploadH        *handler.UploadHandler
 }
 
 // New 构建并配置 Gin 引擎。
@@ -54,6 +55,7 @@ func New(deps Deps) *gin.Engine {
 	registerProjectRoutes(api, deps.ProjectH, auth, middleware.RBACMiddleware)
 	registerDesignRoutes(api, deps.DesignH, auth, middleware.RBACMiddleware)
 	registerMaterialRoutes(api, deps.MaterialH, auth, middleware.RBACMiddleware)
+	registerMaterialUsageRoutes(api, deps.MaterialUsageH, auth, middleware.RBACMiddleware)
 	registerBudgetRoutes(api, deps.BudgetH, auth, middleware.RBACMiddleware)
 	registerConstructionRoutes(api, deps.ConstructionH, auth, middleware.RBACMiddleware)
 

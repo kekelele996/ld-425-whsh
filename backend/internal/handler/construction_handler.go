@@ -3,18 +3,20 @@ package handler
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/home-renovation/platform/internal/dto"
+	"github.com/home-renovation/platform/internal/model"
 	"github.com/home-renovation/platform/internal/service"
 	"github.com/home-renovation/platform/internal/utils"
 )
 
 // ConstructionHandler 施工节点处理器。
 type ConstructionHandler struct {
-	service service.ConstructionService
+	service      service.ConstructionService
+	usageService service.MaterialUsageService
 }
 
 // NewConstructionHandler 构造施工处理器。
-func NewConstructionHandler(service service.ConstructionService) *ConstructionHandler {
-	return &ConstructionHandler{service: service}
+func NewConstructionHandler(service service.ConstructionService, usageService service.MaterialUsageService) *ConstructionHandler {
+	return &ConstructionHandler{service: service, usageService: usageService}
 }
 
 // Create 创建施工节点。
@@ -29,7 +31,7 @@ func (h *ConstructionHandler) Create(c *gin.Context) {
 		c.Error(err)
 		return
 	}
-	utils.Success(c, toConstructionDTO(node))
+	utils.Success(c, toConstructionDTO(node, nil))
 }
 
 // Get 获取施工节点详情。
@@ -44,7 +46,12 @@ func (h *ConstructionHandler) Get(c *gin.Context) {
 		c.Error(err)
 		return
 	}
-	utils.Success(c, toConstructionDTO(node))
+	details, err := h.usageService.ListDetailsByNode(id)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	utils.Success(c, toConstructionDTO(node, details))
 }
 
 // List 获取施工节点列表。
@@ -61,7 +68,12 @@ func (h *ConstructionHandler) List(c *gin.Context) {
 			c.Error(err)
 			return
 		}
-		utils.Success(c, toConstructionDTOList(nodes))
+		dtos, err := h.toConstructionDTOs(nodes)
+		if err != nil {
+			c.Error(err)
+			return
+		}
+		utils.Success(c, dtos)
 		return
 	}
 	status := c.Query("status")
@@ -70,7 +82,25 @@ func (h *ConstructionHandler) List(c *gin.Context) {
 		c.Error(err)
 		return
 	}
-	utils.Success(c, utils.PageResult{List: toConstructionDTOList(nodes), Total: total, Page: page, PageSize: pageSize})
+	dtos, err := h.toConstructionDTOs(nodes)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	utils.Success(c, utils.PageResult{List: dtos, Total: total, Page: page, PageSize: pageSize})
+}
+
+// toConstructionDTOs 批量附带各节点用料明细。
+func (h *ConstructionHandler) toConstructionDTOs(nodes []model.ConstructionNode) ([]dto.ConstructionDTO, error) {
+	out := make([]dto.ConstructionDTO, 0, len(nodes))
+	for i := range nodes {
+		details, err := h.usageService.ListDetailsByNode(nodes[i].ID)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, toConstructionDTO(&nodes[i], details))
+	}
+	return out, nil
 }
 
 // Update 更新施工节点。
@@ -90,7 +120,7 @@ func (h *ConstructionHandler) Update(c *gin.Context) {
 		c.Error(err)
 		return
 	}
-	utils.Success(c, toConstructionDTO(node))
+	utils.Success(c, toConstructionDTO(node, nil))
 }
 
 // Delete 删除施工节点。
@@ -124,7 +154,7 @@ func (h *ConstructionHandler) UpdateStatus(c *gin.Context) {
 		c.Error(err)
 		return
 	}
-	utils.Success(c, toConstructionDTO(node))
+	utils.Success(c, toConstructionDTO(node, nil))
 }
 
 // Accept 施工验收。
@@ -144,5 +174,10 @@ func (h *ConstructionHandler) Accept(c *gin.Context) {
 		c.Error(err)
 		return
 	}
-	utils.Success(c, toConstructionDTO(node))
+	details, err := h.usageService.ListDetailsByNode(id)
+	if err != nil {
+		c.Error(err)
+		return
+	}
+	utils.Success(c, toConstructionDTO(node, details))
 }

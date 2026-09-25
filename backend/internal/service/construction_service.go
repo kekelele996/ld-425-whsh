@@ -11,6 +11,7 @@ import (
 	apperrors "github.com/home-renovation/platform/internal/errors"
 	"github.com/home-renovation/platform/internal/model"
 	"github.com/home-renovation/platform/internal/repository"
+	"gorm.io/gorm"
 )
 
 // ConstructionService 施工节点服务接口。
@@ -27,12 +28,13 @@ type ConstructionService interface {
 
 type constructionService struct {
 	repo   repository.ConstructionRepository
+	txMgr  repository.TransactionManager
 	logger *slog.Logger
 }
 
 // NewConstructionService 构造施工服务。
-func NewConstructionService(repo repository.ConstructionRepository, logger *slog.Logger) ConstructionService {
-	return &constructionService{repo: repo, logger: logger}
+func NewConstructionService(repo repository.ConstructionRepository, txMgr repository.TransactionManager, logger *slog.Logger) ConstructionService {
+	return &constructionService{repo: repo, txMgr: txMgr, logger: logger}
 }
 
 func (s *constructionService) Create(req *dto.CreateConstructionRequest) (*model.ConstructionNode, error) {
@@ -166,6 +168,7 @@ func (s *constructionService) Accept(id uint, req *dto.AcceptConstructionRequest
 	if node.Status != constants.ConstructionStatusCompleted {
 		return nil, apperrors.NewConflict("only completed node can be accepted")
 	}
+
 	if req.Accepted {
 		node.AcceptanceStatus = constants.AcceptanceStatusPassed
 	} else {
@@ -173,8 +176,26 @@ func (s *constructionService) Accept(id uint, req *dto.AcceptConstructionRequest
 	}
 	node.AcceptancePhotos = marshalStrings(req.Photos)
 	node.AcceptanceNote = req.Note
-	if err := s.repo.Update(node); err != nil {
-		return nil, fmt.Errorf("accept construction node: %w", err)
+
+	// 验收结果与用料状态必须同进同退：
+	// 通过 -> 用料计入已安装量；不通过 -> 用料转为待确认，不参与余量计算。
+	usageStatus := constants.MaterialUsageStatusExcluded
+	if req.Accepted {
+		usageStatus = constants.MaterialUsageStatusCounted
+	}
+	txErr := s.txMgr.RunInTx(func(tx *gorm.DB) error {
+		txNodeRepo := repository.NewConstructionRepository(tx)
+		txUsageRepo := repository.NewMaterialUsageRepository(tx)
+		if err := txNodeRepo.Update(node); err != nil {
+			return fmt.Errorf("update construction node: %w", err)
+		}
+		if err := txUsageRepo.UpdateStatusByNode(id, usageStatus); err != nil {
+			return fmt.Errorf("update material usage status: %w", err)
+		}
+		return nil
+	})
+	if txErr != nil {
+		return nil, fmt.Errorf("accept construction node: %w", txErr)
 	}
 	s.logger.Info("construction node accepted", "node_id", id, "accepted", req.Accepted)
 	return node, nil

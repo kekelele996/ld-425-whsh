@@ -6,6 +6,7 @@ export const API_PATHS = {
   projects: '/api/v1/projects',
   designs: '/api/v1/designs',
   materials: '/api/v1/materials',
+  materialUsages: '/api/v1/material-usages',
   budgets: '/api/v1/budgets',
   constructions: '/api/v1/constructions',
   auditLogs: '/api/v1/audit-logs',

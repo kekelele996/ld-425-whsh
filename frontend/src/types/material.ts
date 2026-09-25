@@ -14,6 +14,8 @@ export interface MaterialItem {
   purchase_status: PurchaseStatus
   supplier: string
   space: string
+  installed_quantity: number
+  remaining_quantity: number
   created_at: string
   updated_at: string
 }

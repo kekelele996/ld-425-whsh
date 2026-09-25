@@ -2,6 +2,7 @@ export * from './enums'
 export * from './project'
 export * from './design'
 export * from './material'
+export * from './materialUsage'
 export * from './budget'
 export * from './construction'
 

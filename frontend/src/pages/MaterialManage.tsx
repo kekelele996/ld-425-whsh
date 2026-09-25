@@ -131,7 +131,30 @@ export default function MaterialManage() {
               { title: '品类', dataIndex: 'category', render: (v) => <ProgressTag text={v} color="cyan" /> },
               { title: '规格型号', dataIndex: 'spec' },
               { title: '品牌', dataIndex: 'brand' },
-              { title: '数量', dataIndex: 'quantity' },
+              {
+                title: '采购量',
+                dataIndex: 'quantity',
+                render: (v, record) => `${v} ${record.unit}`,
+              },
+              {
+                title: '已安装',
+                dataIndex: 'installed_quantity',
+                render: (v, record) => (
+                  <span style={{ color: '#52c41a' }}>{v ?? 0} {record.unit}</span>
+                ),
+              },
+              {
+                title: '剩余',
+                dataIndex: 'remaining_quantity',
+                render: (v, record) => {
+                  const remaining = v ?? record.quantity
+                  return (
+                    <span style={{ color: remaining <= 0 ? '#ff4d4f' : undefined }}>
+                      {remaining} {record.unit}
+                    </span>
+                  )
+                },
+              },
               { title: '单价', dataIndex: 'unit_price', render: (v) => formatCurrency(v) },
               { title: '总价', dataIndex: 'total_price', render: (v) => formatCurrency(v) },
               { title: '采购状态', dataIndex: 'purchase_status', render: (v) => <StatusBadge status={v} /> },

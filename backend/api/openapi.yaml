@@ -62,12 +62,32 @@ paths:
   /constructions/{id}/accept:
     put:
       summary: 施工验收
+      description: 验收通过后该节点登记的用料计入材料已安装量；不通过则转为待确认，不参与余量计算。
       tags: [Construction]
       parameters:
         - name: id
           in: path
           required: true
           schema: { type: integer }
+      responses:
+        '200':
+          description: 成功
+  /material-usages:
+    get:
+      summary: 查询节点用料明细
+      tags: [MaterialUsage]
+      parameters:
+        - name: node_id
+          in: query
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 成功
+    post:
+      summary: 节点完工前登记用料
+      description: 同一节点重复登记同一材料时保留第一次结果；累计待计入+已计入数量不能超过采购量。
+      tags: [MaterialUsage]
       responses:
         '200':
           description: 成功
@@ -108,3 +128,24 @@ components:
         house_type: { type: string }
         decor_style: { type: string }
         status: { type: string }
+    Material:
+      type: object
+      properties:
+        id: { type: integer }
+        project_id: { type: integer }
+        name: { type: string }
+        quantity: { type: number, description: 采购量 }
+        installed_quantity: { type: number, description: 已安装量（仅验收通过的用料） }
+        remaining_quantity: { type: number, description: 剩余量 = 采购量 - 已安装量 }
+        purchase_status: { type: string }
+    MaterialUsage:
+      type: object
+      properties:
+        id: { type: integer }
+        node_id: { type: integer }
+        material_id: { type: integer }
+        material_name: { type: string }
+        quantity: { type: number }
+        unit: { type: string }
+        status: { type: string, enum: [Pending, Counted, Excluded] }
+        remark: { type: string }

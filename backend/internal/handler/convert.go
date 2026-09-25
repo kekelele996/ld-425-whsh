@@ -5,6 +5,7 @@ import (
 
 	"github.com/home-renovation/platform/internal/dto"
 	"github.com/home-renovation/platform/internal/model"
+	"github.com/home-renovation/platform/internal/service"
 )
 
 func toProjectDTO(project *model.RenovationProject) dto.ProjectDTO {
@@ -44,23 +45,25 @@ func toDesignDTO(phase *model.DesignPhase) dto.DesignDTO {
 	}
 }
 
-func toMaterialDTO(item *model.MaterialItem) dto.MaterialDTO {
+func toMaterialDTO(item *model.MaterialItem, installed float64) dto.MaterialDTO {
 	return dto.MaterialDTO{
-		ID:             item.ID,
-		ProjectID:      item.ProjectID,
-		Name:           item.Name,
-		Category:       item.Category,
-		Spec:           item.Spec,
-		Brand:          item.Brand,
-		Quantity:       item.Quantity,
-		Unit:           item.Unit,
-		UnitPrice:      item.UnitPrice,
-		TotalPrice:     item.TotalPrice,
-		PurchaseStatus: item.PurchaseStatus,
-		Supplier:       item.Supplier,
-		Space:          item.Space,
-		CreatedAt:      item.CreatedAt,
-		UpdatedAt:      item.UpdatedAt,
+		ID:                item.ID,
+		ProjectID:         item.ProjectID,
+		Name:              item.Name,
+		Category:          item.Category,
+		Spec:              item.Spec,
+		Brand:             item.Brand,
+		Quantity:          item.Quantity,
+		Unit:              item.Unit,
+		UnitPrice:         item.UnitPrice,
+		TotalPrice:        item.TotalPrice,
+		PurchaseStatus:    item.PurchaseStatus,
+		Supplier:          item.Supplier,
+		Space:             item.Space,
+		InstalledQuantity: installed,
+		RemainingQuantity: item.Quantity - installed,
+		CreatedAt:         item.CreatedAt,
+		UpdatedAt:         item.UpdatedAt,
 	}
 }
 
@@ -78,7 +81,7 @@ func toBudgetDTO(item *model.BudgetItem) dto.BudgetDTO {
 	}
 }
 
-func toConstructionDTO(node *model.ConstructionNode) dto.ConstructionDTO {
+func toConstructionDTO(node *model.ConstructionNode, details []service.UsageDetail) dto.ConstructionDTO {
 	return dto.ConstructionDTO{
 		ID:               node.ID,
 		ProjectID:        node.ProjectID,
@@ -91,8 +94,25 @@ func toConstructionDTO(node *model.ConstructionNode) dto.ConstructionDTO {
 		AcceptanceStatus: node.AcceptanceStatus,
 		AcceptancePhotos: parseStringSlice(node.AcceptancePhotos),
 		AcceptanceNote:   node.AcceptanceNote,
+		Usages:           toUsageDetailDTOList(details),
 		CreatedAt:        node.CreatedAt,
 		UpdatedAt:        node.UpdatedAt,
+	}
+}
+
+func toUsageDetailDTO(detail service.UsageDetail) dto.MaterialUsageDTO {
+	return dto.MaterialUsageDTO{
+		ID:           detail.Usage.ID,
+		ProjectID:    detail.Usage.ProjectID,
+		NodeID:       detail.Usage.NodeID,
+		MaterialID:   detail.Usage.MaterialID,
+		MaterialName: detail.MaterialName,
+		Quantity:     detail.Usage.Quantity,
+		Unit:         detail.Unit,
+		Status:       detail.Usage.Status,
+		Remark:       detail.Usage.Remark,
+		CreatedAt:    detail.Usage.CreatedAt,
+		UpdatedAt:    detail.Usage.UpdatedAt,
 	}
 }
 
@@ -123,14 +143,6 @@ func toDesignDTOList(phases []model.DesignPhase) []dto.DesignDTO {
 	return out
 }
 
-func toMaterialDTOList(items []model.MaterialItem) []dto.MaterialDTO {
-	out := make([]dto.MaterialDTO, 0, len(items))
-	for _, item := range items {
-		out = append(out, toMaterialDTO(&item))
-	}
-	return out
-}
-
 func toBudgetDTOList(items []model.BudgetItem) []dto.BudgetDTO {
 	out := make([]dto.BudgetDTO, 0, len(items))
 	for _, item := range items {
@@ -139,10 +151,10 @@ func toBudgetDTOList(items []model.BudgetItem) []dto.BudgetDTO {
 	return out
 }
 
-func toConstructionDTOList(nodes []model.ConstructionNode) []dto.ConstructionDTO {
-	out := make([]dto.ConstructionDTO, 0, len(nodes))
-	for _, item := range nodes {
-		out = append(out, toConstructionDTO(&item))
+func toUsageDetailDTOList(details []service.UsageDetail) []dto.MaterialUsageDTO {
+	out := make([]dto.MaterialUsageDTO, 0, len(details))
+	for _, detail := range details {
+		out = append(out, toUsageDetailDTO(detail))
 	}
 	return out
 }

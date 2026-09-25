@@ -8,7 +8,7 @@ type LoginRequest struct {
 
 // LoginResponse 登录响应。
 type LoginResponse struct {
-	Token string `json:"token"`
+	Token string  `json:"token"`
 	User  UserDTO `json:"user"`
 }
 

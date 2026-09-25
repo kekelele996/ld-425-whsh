@@ -22,16 +22,21 @@ type MaterialService interface {
 	Update(id uint, req *dto.UpdateMaterialRequest) (*model.MaterialItem, error)
 	Delete(id uint) error
 	UpdateStatus(id uint, status string) (*model.MaterialItem, error)
+	// InstalledQuantity 某材料已计入安装的数量（仅验收通过的用料）。
+	InstalledQuantity(materialID uint) (float64, error)
+	// InstalledQuantities 按材料ID批量返回已计入安装的数量。
+	InstalledQuantities(materialIDs []uint) (map[uint]float64, error)
 }
 
 type materialService struct {
-	repo   repository.MaterialRepository
-	logger *slog.Logger
+	repo      repository.MaterialRepository
+	usageRepo repository.MaterialUsageRepository
+	logger    *slog.Logger
 }
 
 // NewMaterialService 构造材料服务。
-func NewMaterialService(repo repository.MaterialRepository, logger *slog.Logger) MaterialService {
-	return &materialService{repo: repo, logger: logger}
+func NewMaterialService(repo repository.MaterialRepository, usageRepo repository.MaterialUsageRepository, logger *slog.Logger) MaterialService {
+	return &materialService{repo: repo, usageRepo: usageRepo, logger: logger}
 }
 
 func (s *materialService) Create(req *dto.CreateMaterialRequest) (*model.MaterialItem, error) {
@@ -154,4 +159,23 @@ func (s *materialService) UpdateStatus(id uint, status string) (*model.MaterialI
 	}
 	s.logger.Info("material purchase status changed", "material_id", id, "status", status)
 	return item, nil
+}
+
+func (s *materialService) InstalledQuantity(materialID uint) (float64, error) {
+	totals, err := s.usageRepo.SumQuantityByMaterials(0, []uint{materialID}, []string{constants.MaterialUsageStatusCounted})
+	if err != nil {
+		return 0, fmt.Errorf("sum installed quantity for material %d: %w", materialID, err)
+	}
+	return totals[materialID], nil
+}
+
+func (s *materialService) InstalledQuantities(materialIDs []uint) (map[uint]float64, error) {
+	if len(materialIDs) == 0 {
+		return map[uint]float64{}, nil
+	}
+	totals, err := s.usageRepo.SumQuantityByMaterials(0, materialIDs, []string{constants.MaterialUsageStatusCounted})
+	if err != nil {
+		return nil, fmt.Errorf("sum installed quantities: %w", err)
+	}
+	return totals, nil
 }

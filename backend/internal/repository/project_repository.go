@@ -23,7 +23,7 @@ type ProjectRepository interface {
 
 // ProjectFilter 项目查询过滤条件。
 type ProjectFilter struct {
-	Status string
+	Status  string
 	Keyword string
 }
 

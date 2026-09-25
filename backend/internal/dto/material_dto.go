@@ -36,19 +36,21 @@ type UpdateMaterialStatusRequest struct {
 
 // MaterialDTO 材料展示结构。
 type MaterialDTO struct {
-	ID             uint      `json:"id"`
-	ProjectID      uint      `json:"project_id"`
-	Name           string    `json:"name"`
-	Category       string    `json:"category"`
-	Spec           string    `json:"spec"`
-	Brand          string    `json:"brand"`
-	Quantity       float64   `json:"quantity"`
-	Unit           string    `json:"unit"`
-	UnitPrice      float64   `json:"unit_price"`
-	TotalPrice     float64   `json:"total_price"`
-	PurchaseStatus string    `json:"purchase_status"`
-	Supplier       string    `json:"supplier"`
-	Space          string    `json:"space"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID                uint      `json:"id"`
+	ProjectID         uint      `json:"project_id"`
+	Name              string    `json:"name"`
+	Category          string    `json:"category"`
+	Spec              string    `json:"spec"`
+	Brand             string    `json:"brand"`
+	Quantity          float64   `json:"quantity"`
+	Unit              string    `json:"unit"`
+	UnitPrice         float64   `json:"unit_price"`
+	TotalPrice        float64   `json:"total_price"`
+	PurchaseStatus    string    `json:"purchase_status"`
+	Supplier          string    `json:"supplier"`
+	Space             string    `json:"space"`
+	InstalledQuantity float64   `json:"installed_quantity"`
+	RemainingQuantity float64   `json:"remaining_quantity"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }

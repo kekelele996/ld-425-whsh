@@ -1,4 +1,5 @@
 import type { ConstructionStatus, AcceptanceStatus } from './enums'
+import type { MaterialUsage } from './materialUsage'
 
 export interface ConstructionNode {
   id: number
@@ -12,6 +13,7 @@ export interface ConstructionNode {
   acceptance_status: AcceptanceStatus
   acceptance_photos: string[]
   acceptance_note: string
+  usages: MaterialUsage[]
   created_at: string
   updated_at: string
 }

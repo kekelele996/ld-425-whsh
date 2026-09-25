@@ -83,6 +83,7 @@ docker compose --env-file .env down -v --remove-orphans
 | PUT | /api/v1/designs/:id/review | 审核（通过/驳回） | Admin/Owner |
 | GET/POST | /api/v1/materials | 材料列表/创建 | 列表所有角色，创建 Admin/Designer/PM |
 | PUT | /api/v1/materials/:id/status | 采购状态流转 | Admin/Designer/Contractor/PM |
+| GET/POST | /api/v1/material-usages/node?node_id= | 节点用料明细/完工前登记用料 | 登记 Admin/Contractor/PM |
 | GET/POST | /api/v1/budgets | 预算列表/创建 | 列表所有角色，创建 Admin/PM |
 | GET/POST | /api/v1/constructions | 施工列表/创建 | 列表所有角色，创建 Admin/PM |
 | PUT | /api/v1/constructions/:id/status | 施工状态流转 | Admin/Contractor/PM |
